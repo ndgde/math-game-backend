@@ -1,97 +1,55 @@
 package main
 
 import (
-	"fmt"
-	"math/rand"
+	"net/http"
 
-	fdb "github.com/ndgde/flimsy-db/cmd/flimsydb"
-	cm "github.com/ndgde/flimsy-db/cmd/flimsydb/common"
-	"github.com/ndgde/flimsy-db/cmd/flimsydb/indexer"
+	"github.com/gin-gonic/gin"
 )
 
+type album struct {
+	ID     string  `json:"id"`
+	Title  string  `json:"title"`
+	Artist string  `json:"artist"`
+	Price  float64 `json:"price"`
+}
+
+var albums = []album{
+	{ID: "1", Title: "Blue Train", Artist: "John Coltrane", Price: 56.99},
+	{ID: "2", Title: "Jeru", Artist: "Gerry Mulligan", Price: 17.99},
+	{ID: "3", Title: "Sarah Vaughan and Clifford Brown", Artist: "Sarah Vaughan", Price: 39.99},
+}
+
 func main() {
-	col1, err := fdb.NewColumn("Name", cm.StringTType, "", indexer.BTreeIndexerType, 0)
-	if err != nil {
-		fmt.Println(err)
+	router := gin.Default()
+	router.GET("/albums", getAlbums)
+	router.GET("albums/:id", getAlbumByID)
+	router.POST("/albums", postAlbums)
+
+	router.Run("localhost:8089")
+}
+
+func getAlbums(c *gin.Context) {
+	c.IndentedJSON(http.StatusOK, albums)
+}
+
+func postAlbums(c *gin.Context) {
+	var newAlbum album
+	if err := c.BindJSON(&newAlbum); err != nil {
+		return
 	}
 
-	col2, err := fdb.NewColumn("Age", cm.Int32TType, int32(0), indexer.HashMapIndexerType, 0)
-	if err != nil {
-		fmt.Println(err)
-	}
+	albums = append(albums, newAlbum)
+	c.IndentedJSON(http.StatusCreated, newAlbum)
+}
 
-	col3, err := fdb.NewColumn("Salary", cm.Float64TType, float64(0), indexer.BTreeIndexerType, 0)
-	if err != nil {
-		fmt.Println(err)
-	}
+func getAlbumByID(c *gin.Context) {
+	id := c.Param("id")
 
-	col4, err := fdb.NewColumn("Position", cm.StringTType, "", indexer.HashMapIndexerType, 0)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	col5, err := fdb.NewColumn("Department", cm.StringTType, "", indexer.BTreeIndexerType, 0)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	col6, err := fdb.NewColumn("Experience", cm.Int32TType, int32(0), indexer.AbsentIndexerType, 0)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	col7, err := fdb.NewColumn("Country", cm.StringTType, "", indexer.HashMapIndexerType, 0)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	columns := []*fdb.Column{col1, col2, col3, col4, col5, col6, col7}
-
-	table := fdb.NewTable(columns)
-
-	for i := 0; i < 250; i++ {
-		row := map[string]any{
-			"Name":       randomName(),
-			"Age":        int32(rand.Intn(65) + 18),
-			"Salary":     float64(rand.Intn(100000)) / 100.0,
-			"Position":   randomPosition(),
-			"Department": randomDepartment(),
-			"Experience": int32(rand.Intn(40)),
-			"Country":    randomCountry(),
-		}
-
-		if err := table.InsertRow(row); err != nil {
-			fmt.Println("Row adding error:", err)
+	for _, a := range albums {
+		if a.ID == id {
+			c.IndentedJSON(http.StatusOK, a)
+			return
 		}
 	}
-
-	fdb.PrintTable(table)
-
-	rows, err := table.Find("Name", "Jane Smith")
-	if err != nil {
-		fmt.Printf("finding error: %v", err)
-	}
-	for _, row := range rows {
-		fmt.Println(row)
-	}
-}
-
-func randomName() string {
-	names := []string{"John Doe", "Max Mustermann", "Fill Murray", "Jane Smith", "Alice Johnson", "Bob Brown"}
-	return names[rand.Intn(len(names))]
-}
-
-func randomPosition() string {
-	positions := []string{"Engineer", "Manager", "Analyst", "Director", "Consultant", "Developer"}
-	return positions[rand.Intn(len(positions))]
-}
-
-func randomDepartment() string {
-	departments := []string{"Finance", "Engineering", "HR", "Sales", "Marketing", "Support"}
-	return departments[rand.Intn(len(departments))]
-}
-
-func randomCountry() string {
-	countries := []string{"USA", "Germany", "Canada", "UK", "Australia", "India"}
-	return countries[rand.Intn(len(countries))]
+	c.IndentedJSON(http.StatusNotFound, gin.H{"message": "album not fount"})
 }
